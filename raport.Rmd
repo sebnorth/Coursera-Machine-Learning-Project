@@ -1,0 +1,65 @@
+# Coursera Machine Learning Project
+
+## loading packages and data
+
+```{r loading, eval=F}
+library(data.table)
+library(caret)
+library(ggplot2)
+library(knitr)
+library(xtable)
+library(randomForest)
+library(foreach)
+
+raw.train  <- fread("pml-training.csv", na.strings=c("#DIV/0!", ""))
+raw.test <- fread("pml-testing.csv", na.strings=c("#DIV/0!", ""))
+```
+
+### We removed excel error strings `#DIV/0!` and empty strings and replace these with `NA` values
+
+## Cleaning data
+
+```{r cleaning, eval=F}
+na.cols <- raw.train[,sapply(.SD, function(x) any(is.na(x)))]
+na.cols2 <- raw.test[,sapply(.SD, function(x) any(is.na(x)))]
+```
+
+### We removed any features that contained NA values.
+
+```{r features, eval=F}
+drop.unwanted.features <- function(x) {
+    x[,!c("V1", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window"),with=F]
+}
+
+columns_with_values <- drop.unwanted.features(raw.train[,eval(names(which(na.cols == F))),with=F])
+```
+
+### We are interested only in columns that have values
+
+## Generating files:
+
+```{r files, eval=F}
+write.pml.predictions <- function(x) {
+    n = length(x)
+    for(i in 1:n){
+        filename = paste0("problem_id_",i,".txt")
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+}
+```
+
+## Cross Validation, Modeling, Prediction
+
+```{r prediction, eval=F}
+submit.prediction <- function(x, testset) {
+    in.train <- createDataPartition(x$classe, p=.60, list=FALSE)
+    train <- x[in.train[,1]]
+    model.rf <- train(y=as.factor(train$classe), x=train[,!"classe",with=F], tuneGrid=data.frame(mtry=3), trControl=trainControl(method="none"))  
+    write.pml.predictions(predict(model.rf, newdata=drop.unwanted.features(testset[,eval(names(which(na.cols2 == F))[-60]),with=F])))
+    
+}
+```
+
+Now to obtain 20 files we run the command:
+
+submit.prediction(columns_with_values, raw.test)
